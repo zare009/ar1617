@@ -1594,6 +1594,7 @@ int main()
   //printing set of rewrites
   cout << "{ ";
   for (set<Formula>::iterator it = system.begin(); it != system.end(); it++) {
+
       cout << *it << ", ";
   }
   cout << " }";
