@@ -1529,8 +1529,38 @@ public:
 
 typedef set<Formula> RewriteSystem;
 
-void knut_bendix (){
+void knut_bendix (RewriteSystem &system){
   std::cout << "Knut Bendix completation procedure" << std::endl;
+
+  //algoritam
+
+  //za setnju kroz pravila
+ /* RewriteSystem s2 = system;
+  RewriteSystem::iterator it2 = s2.begin();
+  it2++;
+
+  //uzimamo prvu relaciju
+  RewriteSystem::iterator it = system.begin();
+
+  for (proci kroz sve relacijeSve){
+
+    //getAllCriticalPairs(*it1, *it2);
+    //uzeti prvi kriticni i kombinovati sa svim ostalim
+    
+    for (svaki <u1, u2> )
+      u1_pom = normalna_forma(u1);
+      u2_pom = normalna_forma(u2);
+
+      if(u1_pom != u2_pom && duzine_jednake(u1_pom, u2_pom))
+        return fail;
+      else if(u1_pom > u2_pom)
+        relacija = relacija.append(rewrite(u1_pom, u2_pom));
+      else if(u2_pom > u1_pom)
+        relacija = relacija.append(rewrite(u2_pom, u1_pom));
+  
+      relacija ++;
+  }*/
+
 }
 
 
@@ -1593,7 +1623,7 @@ int main()
 
   //printing set of rewrites
   cout << "{ ";
-  for (set<Formula>::iterator it = system.begin(); it != system.end(); it++) {
+  for (RewriteSystem::iterator it = system.begin(); it != system.end(); it++) {
 
       cout << *it << ", ";
   }
@@ -1648,7 +1678,7 @@ int main()
 
   //cout << and_f->eval(st, val) << endl;
 
-  knut_bendix ();
+  knut_bendix (system);
 
 	return 0;
 }
