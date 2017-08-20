@@ -1527,9 +1527,11 @@ public:
 };
 
 
-/*int Knut_Bendix (vector<Term> &set_of_terms, ){
+typedef set<Formula> RewriteSystem;
 
-}*/
+void knut_bendix (){
+  std::cout << "Knut Bendix completation procedure" << std::endl;
+}
 
 
 int main()
@@ -1548,6 +1550,9 @@ int main()
   s.addPredicateSymbol("=", 2);
   s.addPredicateSymbol("<=", 2);
 
+  //rewrite predicate symbol
+  s.addPredicateSymbol("rewrite", 2);
+
 
   /* Primeri termova i formula */
 
@@ -1556,11 +1561,11 @@ int main()
 
   Formula f0 = make_shared<Atom>(s, "even", vector<Term> { t0 });
 
-  cout << f0 << endl;
+  //cout << f0 << endl;
   
   Formula f1 = make_shared<Atom>(s, "even", vector<Term> { t1 });
 
-  cout << f1 << endl;
+  //cout << f1 << endl;
   
   Term tx = make_shared<VariableTerm>("x");
   Term ty = make_shared<VariableTerm>("y");
@@ -1573,7 +1578,27 @@ int main()
 
   Formula xpyeven = make_shared<Atom>(s, "even", vector<Term> { xpy });
 
-  cout << xpyeven << endl;
+  //formula koja predstavlja rewriting
+  Formula rewrite1 = make_shared<Atom>(s, "rewrite", vector<Term> {tx, ty});
+  Formula rewrite2 = make_shared<Atom>(s, "rewrite", vector<Term> {xpy, tx});
+
+  RewriteSystem system;
+  system.insert(rewrite1);
+  system.insert(rewrite2);
+
+  //cout << xpyeven << endl;
+
+  cout << rewrite1 << endl;
+  cout << rewrite2 << endl;
+
+  //printing set of rewrites
+  cout << "{ ";
+  for (set<Formula>::iterator it = system.begin(); it != system.end(); it++) {
+      cout << *it << ", ";
+  }
+  cout << " }";
+
+  cout << endl << endl << endl;
 
   Formula xandy = make_shared<And>(xeven, yeven);
   Formula imp = make_shared<Imp>(xandy, xpyeven);
@@ -1581,7 +1606,7 @@ int main()
   Formula forall_x = make_shared<Forall>("x", imp);
   Formula forall_y = make_shared<Forall>("y", forall_x);
 
-  cout << forall_y << endl;
+  //cout << forall_y << endl;
   
   /* Semantika */
 
@@ -1612,19 +1637,17 @@ int main()
   val.setValue("y", 3);
 
   /* Primeri izracunavanja vrednosti termova i formula */
-  cout << xpy->eval(st, val) << endl;
+  //cout << xpy->eval(st, val) << endl;
   
-  cout << forall_y->eval(st,val) << endl;
+  //cout << forall_y->eval(st,val) << endl;
 
   Formula and_f = make_shared<And>(xeven, forall_y);
 
-  cout << and_f << endl;
+  //cout << and_f << endl;
 
-  cout << and_f->eval(st, val) << endl;
+  //cout << and_f->eval(st, val) << endl;
 
-
-  //int knut = Knut_Bendix ();
-
+  knut_bendix ();
 
 	return 0;
 }
