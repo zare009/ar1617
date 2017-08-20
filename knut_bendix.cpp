@@ -1414,6 +1414,82 @@ public:
   }
 };
 
+/* Klasa predstavlja binarnu funkciju sabiranja po modulu n */
+class Plus : public Function {
+private:
+  unsigned _domain_size;
+public:
+  Plus(unsigned domain_size)
+    : Function(2),
+      _domain_size(domain_size)
+  {}
+  
+  virtual unsigned eval(const vector<unsigned> & args)
+  {
+    if(args.size() != 2) 
+      throw "Arguments number mismatch";
+    
+    return (args[0] + args[1]) % _domain_size;
+  }
+
+};
+
+/* Klasa predstavlja binarnu funkciju mnozenja po modulu n */
+class Times : public Function {
+private:
+  unsigned _domain_size;
+public:
+  Times(unsigned domain_size)
+    : Function(2),
+      _domain_size(domain_size)
+  {}
+  
+  virtual unsigned eval(const vector<unsigned> & args)
+  {
+    if(args.size() != 2) 
+      throw "Arguments number mismatch";
+    
+    return (args[0] * args[1]) % _domain_size;
+  }
+
+};
+
+/* Klasa predstavlja unarnu relaciju koja sadrzi sve parne brojeve */
+class Even : public Relation {
+
+public:
+  Even()
+    : Relation(1)
+  {}
+  
+  virtual bool eval(const vector<unsigned> & args)
+  {
+    if(args.size() != 1) 
+      throw "Arguments number mismatch";
+    
+    return args[0] % 2 == 0;
+  }
+
+};
+
+/* Klasa predstavlja unarnu relaciju koja sadrzi sve neparne brojeve */
+class Odd : public Relation {
+
+public:
+  Odd()
+    : Relation(1)
+  {}
+  
+  virtual bool eval(const vector<unsigned> & args)
+  {
+    if(args.size() != 1) 
+      throw "Arguments number mismatch";
+    
+    return args[0] % 2 == 1;
+  }
+
+};
+
 /* Klasa predstavlja binarnu relaciju jednakosti */
 class Equal : public Relation {
 
@@ -1432,10 +1508,28 @@ public:
 
 };
 
+/* Klasa predstavlja binarnu relaciju manje ili jednako */
+class LowerOrEqual : public Relation {
 
-int Knut_Bendix (vector<Term> &set_of_terms, ){
+public:
+  LowerOrEqual()
+    : Relation(2)
+  {}
+  
+  virtual bool eval(const vector<unsigned> & args)
+  {
+    if(args.size() != 2) 
+      throw "Arguments number mismatch";
+    
+    return args[0] <= args[1];
+  }
 
-}
+};
+
+
+/*int Knut_Bendix (vector<Term> &set_of_terms, ){
+
+}*/
 
 
 int main()
@@ -1529,7 +1623,7 @@ int main()
   cout << and_f->eval(st, val) << endl;
 
 
-  int knut = Knut_Bendix ();
+  //int knut = Knut_Bendix ();
 
 
 	return 0;
