@@ -1526,16 +1526,43 @@ public:
 
 };
 
+typedef struct criticalPair
+{
+    Term t1;
+    Term t2;
+}CriticalPair;
 
+
+typedef set<CriticalPair> CriticalPairs;
 typedef set<Formula> RewriteSystem;
 
-void knut_bendix (RewriteSystem &system){
-  std::cout << "Knut Bendix completation procedure" << std::endl;
+void getAllCriticalPairs (CriticalPairs &criticals, Formula f1, Formula f2) {
+  cout << "Uzimamo kriticne parove za " << f1 << " i " << f2 << endl;
+
+  //f1->getoperant
+  //f2->getoperand
+
+  // l1 -> r1 je iz f1
+  // l2 -> r2 je iz f2
+
+  //ova dva pravila ne smeju imati zajednicke promenljive, to se uvek moze postici preimenovanjem
+
+  // l1' neka je to podterm l1 koji nije promenljivai neka je O najopstiji unifikator termova l1' i l2
+  /*TODO IMPLEMENTIRATI NAJOPSTIJI UNIFIKATOR */
+
+  //term l1[l1'->O(l2)] odredjuje kriticni par <O(r1), O(l1)[O(l1')->O(r2)]>
+}
+
+void knut_bendix (RewriteSystem &system, RewriteSystem &returnSystem){
+  std::cout << "****Knut Bendix completation procedure****" << std::endl;
+  cout << endl << endl << endl;
+
+  RewriteSystem s2 = system;
 
   //algoritam
 
-  //za setnju kroz pravila
- /* RewriteSystem s2 = system;
+/*  //za setnju kroz pravila
+  RewriteSystem s2 = system;
   RewriteSystem::iterator it2 = s2.begin();
   it2++;
 
@@ -1560,6 +1587,30 @@ void knut_bendix (RewriteSystem &system){
   
       relacija ++;
   }*/
+
+  RewriteSystem::iterator it = system.begin();
+
+  RewriteSystem::iterator it2 = (system.begin())++;
+
+  for (int i = 2; it != prev(system.end()) ; it++, i++){
+     //uzeti sve kriticke parove za *it i *it2
+
+    for (; it2 != system.end() ; it2++){
+
+      if (*it == *it2 )
+        continue;
+
+      //uzimamo sve kriticne parove za trenutnu kombinaciju rewrite relacija      
+      CriticalPairs criticals;
+      getAllCriticalPairs(criticals, *it, *it2);
+
+    }
+
+    //poredjujuci element se pomera za 2 od pocetka, pa za 3 itd..
+    it2 = (system.begin());
+    for (int k = 0; k < i; i++)
+      it2  ++;
+  }
 
 }
 
@@ -1590,13 +1641,9 @@ int main()
   Term t1 = make_shared<FunctionTerm>(s, "1");
 
   Formula f0 = make_shared<Atom>(s, "even", vector<Term> { t0 });
-
-  //cout << f0 << endl;
   
   Formula f1 = make_shared<Atom>(s, "even", vector<Term> { t1 });
 
-  //cout << f1 << endl;
-  
   Term tx = make_shared<VariableTerm>("x");
   Term ty = make_shared<VariableTerm>("y");
     
@@ -1611,10 +1658,15 @@ int main()
   //formula koja predstavlja rewriting
   Formula rewrite1 = make_shared<Atom>(s, "rewrite", vector<Term> {tx, ty});
   Formula rewrite2 = make_shared<Atom>(s, "rewrite", vector<Term> {xpy, tx});
+  Formula rewrite3 = make_shared<Atom>(s, "rewrite", vector<Term> {ty, tx});
+
 
   RewriteSystem system;
+  RewriteSystem returnSystem;
+
   system.insert(rewrite1);
   system.insert(rewrite2);
+  system.insert(rewrite3);
 
   //cout << xpyeven << endl;
 
@@ -1643,42 +1695,49 @@ int main()
 
   /* Definisemo domen D = {0, 1, 2, ..., n-1 } */
 
-  Domain domain;
+/*  Domain domain;
   for(unsigned i = 0; i < 8; i++)
     domain.push_back(i);
 
 
   /* Definisemo L-strukturu */
-  Structure st(s, domain);
+ // Structure st(s, domain);
 
   /* Dodeljujemo interpretacije simbolima iz signature */
-  st.addFunction("0", new Zero());
+/*  st.addFunction("0", new Zero());
   st.addFunction("1", new One());
   st.addFunction("+", new Plus(domain.size()));
   st.addFunction("*", new Times(domain.size()));
   st.addRelation("even", new Even());  
   st.addRelation("odd", new Odd());  
   st.addRelation("=", new Equal());  
-  st.addRelation("<=", new LowerOrEqual());
+  st.addRelation("<=", new LowerOrEqual());*/
 
 
   /* Definisemo valuaciju */
-  Valuation val(domain);
+/*  Valuation val(domain);
   val.setValue("x", 1);
-  val.setValue("y", 3);
+  val.setValue("y", 3);*/
 
   /* Primeri izracunavanja vrednosti termova i formula */
   //cout << xpy->eval(st, val) << endl;
   
-  //cout << forall_y->eval(st,val) << endl;
+  //cout << forall_y->eval(st,val) << endl;*/
 
   Formula and_f = make_shared<And>(xeven, forall_y);
 
-  //cout << and_f << endl;
+  knut_bendix (system, returnSystem);
 
-  //cout << and_f->eval(st, val) << endl;
+  cout << endl << endl << endl;
+  cout << "Ispisujemo dopunjen sistem" << endl;
+  //printing completation set of rewrites
+  cout << "{ ";
+  for (RewriteSystem::iterator it = returnSystem.begin(); it != returnSystem.end(); it++) {
 
-  knut_bendix (system);
+      cout << *it << ", ";
+  }
+  cout << " }" << endl;
+  cout << endl << endl << endl;
 
 	return 0;
 }
