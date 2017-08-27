@@ -1661,9 +1661,31 @@ void getAllCriticalPairs (CriticalPairs &criticals, Formula f1, Formula f2) {
   //f1->getoperant
   //f2->getoperand
 
+  vector<Term> f1Terms;
+  vector<Term> f2Terms;
+  
+  // f1Terms = f1->getOperands();
+  // f2Terms = f2->getOperands();
+  
+  TermPairs termPairs;
+  Substitution sub;
+  
+  for(std::vector<Term>::iterator f1Iter = f1Terms.begin(); f1Iter != f1Terms.end(); ++f1Iter)
+  {
+	  for(std::vector<Term>::iterator f2Iter = f2Terms.begin(); f2Iter != f2Terms.end(); ++f2Iter)
+	  {
+		  std::pair <Term,Term> p;
+		  // p = make_pair<Term, Term>(f1Iter, f2Iter);
+		  termPairs.push_back(p);
+	  }
+  }
+  
+  unify(termPairs, sub);
+  
   // l1 -> r1 je iz f1
   // l2 -> r2 je iz f2
 
+  
   //ova dva pravila ne smeju imati zajednicke promenljive, to se uvek moze postici preimenovanjem
 
   // l1' neka je to podterm l1 koji nije promenljivai neka je O najopstiji unifikator termova l1' i l2
