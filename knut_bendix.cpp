@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <memory>
 #include <functional>
+#include <list>
 
 using namespace std;
 
@@ -1376,6 +1377,272 @@ BaseFormula::Type Exists::getType() const
 }
 
 // -----------------------------------------------------------------------
+
+/* Uopstena supstitucija */
+typedef vector< pair<Variable, Term> > Substitution;
+
+/* Funkcija prikazuje uopstenu supstituciju u preglednom obliku */
+ostream & operator << (ostream & ostr, const Substitution & sub);
+
+ostream & operator << (ostream & ostr, const Substitution & sub)
+{
+  ostr << "[ ";
+  for(unsigned i = 0; i < sub.size(); i++)
+    {     
+      ostr << sub[i].first << " ---> " << sub[i].second;
+      if(i < sub.size() - 1)
+	ostr << ", ";      
+    }
+  ostr << " ]";
+
+  return ostr;
+}
+
+/* Funkcije za unifikaciju */
+
+typedef list< pair<Term, Term> > TermPairs;
+
+/* Prikazuje na izlazu skup parova termova koje zelimo 
+   da unifikujemo */
+ostream & operator << (ostream & ostr, const TermPairs & pairs);
+
+ostream & operator << (ostream & ostr, const TermPairs & pairs)
+{
+  for(const auto & p : pairs)
+    {
+      ostr << "(" << p.first << ", " << p.second << ") ";      
+    }
+  return ostr;
+}
+
+/* Ispituje da li je skup parova termova unifikabilan, i vraca
+   najopstiji unifikator ako jeste */
+bool unify(const TermPairs & pairs, Substitution & sub);
+
+/* Pomocna funkcije za unifikaciju -- transformise skup parova
+   termova primenjujuci pravila iz algoritma. */
+bool do_unify(TermPairs & pairs);
+
+/* Primenjuje pravilo factoring */
+void applyFactoring(TermPairs & pairs);
+
+/* Primenjuje pravilo tautology */
+void applyTautology(TermPairs & pairs);
+
+/* Primenjuje pravilo orientation i vraca true ako je tim pravilom nesto
+   promenjeno */
+bool applyOrientation(TermPairs & pairs);
+
+/* Primenjuje pravilo decomposition/collision i vraca true ako je tim
+   pravilom nesto promenjeno */
+bool applyDecomposition(TermPairs & pairs, bool & collision);
+
+/* Primenjuje pravilo application/cycle i vraca true ako je tim pravilom 
+   nesto promenjeno. */
+bool applyApplication(TermPairs & pairs, bool & cycle);
+
+bool unify(const TermPairs & pairs, Substitution & sub)
+{
+  TermPairs res_pairs = pairs;
+
+  if(!do_unify(res_pairs))
+    return false;
+
+  for(auto i = res_pairs.cbegin(); i != res_pairs.cend(); i++)
+    {
+      VariableTerm * vt = (VariableTerm *) (*i).first.get();
+      sub.push_back(make_pair(vt->getVariable(), (*i).second));
+    }
+  
+  return true;
+}
+
+bool do_unify(TermPairs & pairs)
+{
+  bool repeat =  false;
+  bool collision = false;
+  bool cycle = false;
+
+  do {
+    
+    applyFactoring(pairs);    
+    applyTautology(pairs);
+
+    repeat = 
+      applyOrientation(pairs) ||
+      applyDecomposition(pairs, collision) ||
+      applyApplication(pairs, cycle);
+    
+    if(collision || cycle)
+      return false;
+    
+  } while(repeat);
+  
+  return true;
+}
+
+
+void applyFactoring(TermPairs & pairs)
+{
+  for(auto i = pairs.begin(); i != pairs.end(); i++)
+    {
+      auto j = i;
+      j++;
+      while(j != pairs.end())
+	{
+	  if((*j).first->equalTo((*i).first) &&
+	     (*j).second->equalTo((*i).second))
+	    {
+	      cout << "Factoring applied: (" << (*j).first << "," << (*j).second << ")" << endl;
+	      auto erase_it = j;
+	      j++;
+	      pairs.erase(erase_it);
+	      cout << pairs << endl;
+	    }
+	  else
+	    j++;
+	}
+    }
+}
+
+void applyTautology(TermPairs & pairs)
+{
+  auto i = pairs.begin();
+  
+  while(i != pairs.end())
+    {
+      if((*i).first->equalTo((*i).second))
+	{
+	  cout << "Tautology applied: (" << (*i).first << "," << (*i).second << ")" << endl;
+	  auto erase_it = i;
+	  i++;
+	  pairs.erase(erase_it);
+	  cout << pairs << endl;
+	}
+      else
+	i++;
+    }
+}
+
+bool applyOrientation(TermPairs & pairs)
+{
+  bool ret = false;
+
+  for(auto i = pairs.begin(); i != pairs.end(); i++)
+    {
+      if((*i).first->getType() != BaseTerm::TT_VARIABLE &&
+	 (*i).second->getType() == BaseTerm::TT_VARIABLE)
+	{
+	  cout << "Orientation applied: (" << (*i).first << "," << (*i).second << ")" << endl;
+	  swap((*i).first, (*i).second);
+	  ret = true;
+	  cout << pairs << endl;
+	}
+    }
+
+  return ret;
+}
+
+bool applyDecomposition(TermPairs & pairs, bool & collision)
+{
+  bool ret = false;
+  
+  auto i = pairs.begin();
+  while(i != pairs.end())
+    {
+      if((*i).first->getType() == BaseTerm::TT_FUNCTION &&
+	 (*i).second->getType() == BaseTerm::TT_FUNCTION)
+	{
+	  FunctionTerm * ff = (FunctionTerm *) (*i).first.get();
+	  FunctionTerm * fs = (FunctionTerm *) (*i).second.get();
+
+	  if(ff->getSymbol() == fs->getSymbol())
+	    {
+	      const vector<Term> & ff_ops = ff->getOperands();
+	      const vector<Term> & fs_ops = fs->getOperands();
+
+	      for(unsigned k = 0; k < ff_ops.size(); k++)
+		{
+		  pairs.push_back(make_pair(ff_ops[k], fs_ops[k]));
+		}
+
+	      cout << "Decomposition applied: (" << (*i).first << "," << (*i).second << ")" << endl;
+	      auto erase_it = i;
+	      i++;
+	      pairs.erase(erase_it);
+	      cout << pairs << endl;
+	      ret = true;
+	    }
+	  else
+	    {
+	      cout << "Collision detected: " << ff->getSymbol() << " != " << fs->getSymbol() << endl;
+	      collision = true;
+	      return true;
+	    }
+	  
+	}
+      else
+	i++;
+    }
+
+  collision = false;
+  return ret;
+
+}
+
+bool applyApplication(TermPairs & pairs, bool & cycle)
+{
+  bool ret = false;
+
+  for(auto i = pairs.begin(); i != pairs.end(); i++)
+    {
+      if((*i).first->getType() == BaseTerm::TT_VARIABLE)
+	{
+	  VariableTerm * vt = (VariableTerm *) (*i).first.get();
+	  if((*i).second->containsVariable(vt->getVariable()))
+	    {
+	      cycle = true;
+	      cout << "Cycle detected: " << (*i).second <<  " contains " << vt->getVariable() << endl;
+	      return true;
+	    }
+	  else
+	    {
+	      bool changed = false;
+	      for(auto j = pairs.begin(); j != pairs.end(); j++)
+		{
+		  if(j != i)
+		    {
+		      if((*j).first->containsVariable(vt->getVariable()))
+			{
+			  (*j).first = (*j).first->
+			    substitute(vt->getVariable(),
+				       (*i).second);
+			  ret = true;
+			  changed = true;
+			}
+		      if((*j).second->containsVariable(vt->getVariable()))
+			{
+			  (*j).second = (*j).second->
+			    substitute(vt->getVariable(),
+				       (*i).second);
+			  ret = true;
+			  changed = true;
+			}
+		    }
+		}
+	      if(changed)
+		{
+		  cout << "Application applied: (" << (*i).first << "," << (*i).second << ")" << endl; 
+		  cout << pairs << endl;
+		}
+	    }
+	}
+    }
+  cycle = false;
+  return ret;
+}
+
+
 // -----------------------------------------------------------------------
 
 typedef struct criticalPair
