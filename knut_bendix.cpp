@@ -1660,12 +1660,15 @@ void getAllCriticalPairs (CriticalPairs &criticals, Formula f1, Formula f2) {
 
   //f1->getoperant
   //f2->getoperand
+  
+  Atom *a1 = (Atom*) f1.get();
+  Atom *a2 = (Atom*) f2.get();
 
   vector<Term> f1Terms;
   vector<Term> f2Terms;
   
-  // f1Terms = f1->getOperands();
-  // f2Terms = f2->getOperands();
+   f1Terms = a1->getOperands();
+   f2Terms = a2->getOperands();
   
   TermPairs termPairs;
   Substitution sub;
@@ -1674,22 +1677,25 @@ void getAllCriticalPairs (CriticalPairs &criticals, Formula f1, Formula f2) {
   {
 	  for(std::vector<Term>::iterator f2Iter = f2Terms.begin(); f2Iter != f2Terms.end(); ++f2Iter)
 	  {
-		  std::pair <Term,Term> p;
-		  // p = make_pair<Term, Term>(f1Iter, f2Iter);
-		  termPairs.push_back(p);
+		  termPairs.push_back(make_pair(*f1Iter, *f2Iter));
 	  }
   }
   
-  unify(termPairs, sub);
+// l1' neka je to podterm l1 koji nije promenljivai neka je O najopstiji unifikator termova l1' i l2
+  /*TODO IMPLEMENTIRATI NAJOPSTIJI UNIFIKATOR */
+
+  if (unify(termPairs, sub) == false)
+	cout << "moze" << endl;
   
   // l1 -> r1 je iz f1
   // l2 -> r2 je iz f2
 
-  
-  //ova dva pravila ne smeju imati zajednicke promenljive, to se uvek moze postici preimenovanjem
+  for(std::vector<pair<Variable, Term>>::iterator iter = sub.begin(); iter != sub.end(); iter++)
+{
+	cout<< ">>>>>>>" << iter->first << " " << iter->second << endl;
+}
 
-  // l1' neka je to podterm l1 koji nije promenljivai neka je O najopstiji unifikator termova l1' i l2
-  /*TODO IMPLEMENTIRATI NAJOPSTIJI UNIFIKATOR */
+  //ova dva pravila ne smeju imati zajednicke promenljive, to se uvek moze postici preimenovanjem
 
   //term l1[l1'->O(l2)] odredjuje kriticni par <O(r1), O(l1)[O(l1')->O(r2)]>
 }
@@ -1787,6 +1793,9 @@ int main()
 
   Term tx = make_shared<VariableTerm>("x");
   Term ty = make_shared<VariableTerm>("y");
+
+  Term ta = make_shared<VariableTerm>("a");
+  Term tb = make_shared<VariableTerm>("b");
     
   Term xpy = make_shared<FunctionTerm>(s, "+", vector<Term> {tx, ty});
 
@@ -1795,22 +1804,24 @@ int main()
   Formula yeven = make_shared<Atom>(s, "even", vector<Term> { ty });
 
   Formula xpyeven = make_shared<Atom>(s, "even", vector<Term> { xpy });
+  
+  Term t_nn = make_shared<FunctionTerm> (s, "*", vector<Term> {ta, tb});
 
   //formula koja predstavlja rewriting
   Formula rewrite1 = make_shared<Atom>(s, "rewrite", vector<Term> {tx, ty});
-  Formula rewrite2 = make_shared<Atom>(s, "rewrite", vector<Term> {xpy, tx});
-  Formula rewrite3 = make_shared<Atom>(s, "rewrite", vector<Term> {ty, tx});
+  //Formula rewrite2 = make_shared<Atom>(s, "rewrite", vector<Term> {tx, xpy});
+  Formula rewrite3 = make_shared<Atom>(s, "rewrite", vector<Term> {ty, t_nn});
 
 
   RewriteSystem system;
   RewriteSystem returnSystem;
 
   system.insert(rewrite1);
-  system.insert(rewrite2);
+  //system.insert(rewrite2);
   system.insert(rewrite3);
 
   cout << rewrite1 << endl;
-  cout << rewrite2 << endl;
+  //cout << rewrite2 << endl;
 
   //printing set of rewrites
   cout << "{ ";
