@@ -1655,11 +1655,22 @@ typedef struct criticalPair
 typedef set<CriticalPair> CriticalPairs;
 typedef set<Formula> RewriteSystem;
 
+
+Term getSubterm (const Term &t){
+	FunctionTerm *ft  = (FunctionTerm*) t.get();
+	vector<Term> ops1 = ft->getOperands();
+
+	vector<Term>::iterator l1_prim = ops1.begin();
+	for (;l1_prim!=ops1.end(); l1_prim++)
+	{
+		//TODO dodati proveru da li je function term
+		return *l1_prim;
+	}
+
+}
+
 void getAllCriticalPairs (CriticalPairs &criticals, Formula f1, Formula f2) {
   cout << "Uzimamo kriticne parove za " << f1 << " i " << f2 << endl;
-
-  //f1->getoperant
-  //f2->getoperand
   
   Atom *a1 = (Atom*) f1.get();
   Atom *a2 = (Atom*) f2.get();
@@ -1667,35 +1678,49 @@ void getAllCriticalPairs (CriticalPairs &criticals, Formula f1, Formula f2) {
   vector<Term> f1Terms;
   vector<Term> f2Terms;
   
-   f1Terms = a1->getOperands();
-   f2Terms = a2->getOperands();
+  f1Terms = a1->getOperands();
+  f2Terms = a2->getOperands();
   
   TermPairs termPairs;
   Substitution sub;
   
-  for(std::vector<Term>::iterator f1Iter = f1Terms.begin(); f1Iter != f1Terms.end(); ++f1Iter)
+  /*for(std::vector<Term>::iterator f1Iter = f1Terms.begin(); f1Iter != f1Terms.end(); ++f1Iter)
   {
 	  for(std::vector<Term>::iterator f2Iter = f2Terms.begin(); f2Iter != f2Terms.end(); ++f2Iter)
 	  {
 		  termPairs.push_back(make_pair(*f1Iter, *f2Iter));
 	  }
-  }
+  }*/
   
 // l1' neka je to podterm l1 koji nije promenljivai neka je O najopstiji unifikator termova l1' i l2
   /*TODO IMPLEMENTIRATI NAJOPSTIJI UNIFIKATOR */
 
+  vector<Term>::iterator l1= f1Terms.begin();
+  Term l1_prim = getSubterm (*l1);
+  Term r1 = *(++l1);
+
+  vector<Term>::iterator l2= f2Terms.begin();
+  Term r2 = *(++l2);
+
+  termPairs.push_back(make_pair(l1_prim, *l2));
+
   if (unify(termPairs, sub) == false)
-	cout << "moze" << endl;
+	cout << "ne moze da nadje najop. unifikator" << endl;
   
   // l1 -> r1 je iz f1
   // l2 -> r2 je iz f2
+	
+ FunctionTerm* ftl1 = (FunctionTerm*) (*l1).get();
+ FunctionTerm* ftr1 = (FunctionTerm*) r1.get();
 
   for(std::vector<pair<Variable, Term>>::iterator iter = sub.begin(); iter != sub.end(); iter++)
 {
-	cout<< ">>>>>>>" << iter->first << " " << iter->second << endl;
-}
+	// primenjujemo dobijen najopstiji unifikator
+	ftl1->substitute(iter->first, iter->second);
+	ftr1->substitute(iter->first, iter->second);
 
-  //ova dva pravila ne smeju imati zajednicke promenljive, to se uvek moze postici preimenovanjem
+	cout << "L1: " << ftl1 << " R1: " << ftr1 << endl;
+}
 
   //term l1[l1'->O(l2)] odredjuje kriticni par <O(r1), O(l1)[O(l1')->O(r2)]>
 }
@@ -1736,28 +1761,15 @@ void knut_bendix (RewriteSystem &system, RewriteSystem &returnSystem){
   }*/
 
   RewriteSystem::iterator it = system.begin();
+  RewriteSystem::iterator it2 = ++(system.begin());
 
-  RewriteSystem::iterator it2 = (system.begin())++;
+  //uzimamo sve kriticne parove za trenutnu kombinaciju rewrite relacija      
+  /*TODO PROCI KROZ SVE PAROVE, MI IH IMAMO SAMO 2 ZA SADA*/
+  CriticalPairs criticals;
 
-  for (int i = 2; it != prev(system.end()) ; it++, i++){
-     //uzeti sve kriticke parove za *it i *it2
+  getAllCriticalPairs(criticals, *it, *it2);
 
-    for (; it2 != system.end() ; it2++){
 
-      if (*it == *it2 )
-        continue;
-
-      //uzimamo sve kriticne parove za trenutnu kombinaciju rewrite relacija      
-      CriticalPairs criticals;
-      getAllCriticalPairs(criticals, *it, *it2);
-
-    }
-
-    //poredjujuci element se pomera za 2 od pocetka, pa za 3 itd..
-    it2 = (system.begin());
-    for (int k = 0; k < i; i++)
-      it2  ++;
-  }
 
 }
 
@@ -1773,6 +1785,7 @@ int main()
   s.addFunctionSymbol("1", 0);
   s.addFunctionSymbol("+", 2);
   s.addFunctionSymbol("*", 2);
+  s.addFunctionSymbol("s", 1);
   s.addPredicateSymbol("even", 1);
   s.addPredicateSymbol("odd", 1);
   s.addPredicateSymbol("=", 2);
@@ -1807,27 +1820,32 @@ int main()
   
   Term t_nn = make_shared<FunctionTerm> (s, "*", vector<Term> {ta, tb});
 
-  //formula koja predstavlja rewriting
+
+  /* OVO KORISTIMO ZA REWRITE KOJI SALJEMO */
+  Term s_fn = make_shared<FunctionTerm> (s, "s", vector<Term> {xpy});
+  Term s_y = make_shared<FunctionTerm> (s, "s", vector<Term> {ty});
+  Term s_xpsy = make_shared<FunctionTerm> (s, "+", vector<Term> {s_y, tx});
+
+  Term apzero = make_shared<FunctionTerm> (s, "+", vector<Term> {ta, t0});
+
+/*  //formula koja predstavlja rewriting
   Formula rewrite1 = make_shared<Atom>(s, "rewrite", vector<Term> {tx, ty});
   //Formula rewrite2 = make_shared<Atom>(s, "rewrite", vector<Term> {tx, xpy});
-  Formula rewrite3 = make_shared<Atom>(s, "rewrite", vector<Term> {ty, t_nn});
-
+  Formula rewrite3 = make_shared<Atom>(s, "rewrite", vector<Term> {ty, t_nn});*/
+  Formula rewrite1 = make_shared<Atom>(s, "rewrite", vector<Term> {s_fn, s_xpsy});
+  Formula rewrite2 = make_shared<Atom>(s, "rewrite", vector<Term> {apzero, ta});
 
   RewriteSystem system;
   RewriteSystem returnSystem;
 
   system.insert(rewrite1);
-  //system.insert(rewrite2);
-  system.insert(rewrite3);
-
-  cout << rewrite1 << endl;
-  //cout << rewrite2 << endl;
+  system.insert(rewrite2);
 
   //printing set of rewrites
   cout << "{ ";
   for (RewriteSystem::iterator it = system.begin(); it != system.end(); it++) {
 
-      cout << *it << ", ";
+      cout << *it << " ";
   }
   cout << " }";
 
@@ -1841,7 +1859,7 @@ int main()
   cout << "{ ";
   for (RewriteSystem::iterator it = returnSystem.begin(); it != returnSystem.end(); it++) {
 
-      cout << *it << ", ";
+      cout << *it << " ";
   }
   cout << " }" << endl;
   cout << endl << endl << endl;
