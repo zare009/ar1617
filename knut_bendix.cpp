@@ -1697,13 +1697,14 @@ void getAllCriticalPairs (CriticalPairs &criticals, Formula f1, Formula f2) {
 
   vector<Term>::iterator l1= f1Terms.begin();
   Term l1_prim = getSubterm (*l1);
-  Term r1 = *(++l1);
+  vector<Term>::iterator r1 = ++f1Terms.begin();
 
   vector<Term>::iterator l2= f2Terms.begin();
-  Term r2 = *(++l2);
+  vector<Term>::iterator r2 = ++f2Terms.begin();
+  //Term r2 = *(++l2);
 
   termPairs.push_back(make_pair(l1_prim, *l2));
-
+  
   if (unify(termPairs, sub) == false)
 	cout << "ne moze da nadje najop. unifikator" << endl;
   
@@ -1711,16 +1712,36 @@ void getAllCriticalPairs (CriticalPairs &criticals, Formula f1, Formula f2) {
   // l2 -> r2 je iz f2
 	
  FunctionTerm* ftl1 = (FunctionTerm*) (*l1).get();
- FunctionTerm* ftr1 = (FunctionTerm*) r1.get();
+ FunctionTerm* ftr1 = (FunctionTerm*) (*r1).get();
+ 
+ FunctionTerm* ftl1p = (FunctionTerm*) l1_prim.get();
+ VariableTerm* vtr2 = (VariableTerm*) (*r2).get();
 
+ 
+ cout << "SUB size: " << sub.size() << endl;
+ 
   for(std::vector<pair<Variable, Term>>::iterator iter = sub.begin(); iter != sub.end(); iter++)
 {
+	cout << "SUB v: " << iter->first << " t: " << iter->second << endl;
 	// primenjujemo dobijen najopstiji unifikator
 	ftl1->substitute(iter->first, iter->second);
 	ftr1->substitute(iter->first, iter->second);
 
-	cout << "L1: " << ftl1 << " R1: " << ftr1 << endl;
+	ftl1p->substitute(iter->first, iter->second);
+	vtr2->substitute(iter->first, iter->second);
+	
+	cout << "VTR2: " << vtr2->getVariable() << endl;
+	
+	ftl1->substitute(vtr2->getVariable(), *((Term*)ftl1p));
+	
+	Term* aaa = (dynamic_cast<Term*>(ftr1));
+	Term* bbb = (dynamic_cast<Term*>(ftl1));
+	cout << "[" << aaa << "," << bbb << "]" << endl;
+	
+	//cout << "L1: " << ftl1 << " R1: " << ftr1 << endl;
 }
+
+	
 
   //term l1[l1'->O(l2)] odredjuje kriticni par <O(r1), O(l1)[O(l1')->O(r2)]>
 }
