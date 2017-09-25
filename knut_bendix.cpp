@@ -1716,9 +1716,6 @@ void getAllCriticalPairs (CriticalPairs &criticals, Formula f1, Formula f2) {
  
  FunctionTerm* ftl1p = (FunctionTerm*) l1_prim.get();
  VariableTerm* vtr2 = (VariableTerm*) (*r2).get();
-
- 
- cout << "SUB size: " << sub.size() << endl;
  
   for(std::vector<pair<Variable, Term>>::iterator iter = sub.begin(); iter != sub.end(); iter++)
 {
@@ -1740,8 +1737,6 @@ void getAllCriticalPairs (CriticalPairs &criticals, Formula f1, Formula f2) {
 	
 	//cout << "L1: " << ftl1 << " R1: " << ftr1 << endl;
 }
-
-	
 
   //term l1[l1'->O(l2)] odredjuje kriticni par <O(r1), O(l1)[O(l1')->O(r2)]>
 }
@@ -1815,44 +1810,24 @@ int main()
   //rewrite predicate symbol
   s.addPredicateSymbol("rewrite", 2);
 
-
   /* Primeri termova i formula */
 
   Term t0 = make_shared<FunctionTerm>(s, "0");
   Term t1 = make_shared<FunctionTerm>(s, "1");
-
-  Formula f0 = make_shared<Atom>(s, "even", vector<Term> { t0 });
-  
-  Formula f1 = make_shared<Atom>(s, "even", vector<Term> { t1 });
-
   Term tx = make_shared<VariableTerm>("x");
   Term ty = make_shared<VariableTerm>("y");
-
   Term ta = make_shared<VariableTerm>("a");
-  Term tb = make_shared<VariableTerm>("b");
-    
+  Term tb = make_shared<VariableTerm>("b");  
   Term xpy = make_shared<FunctionTerm>(s, "+", vector<Term> {tx, ty});
-
-  Formula xeven = make_shared<Atom>(s, "even", vector<Term> { tx });
-
-  Formula yeven = make_shared<Atom>(s, "even", vector<Term> { ty });
-
-  Formula xpyeven = make_shared<Atom>(s, "even", vector<Term> { xpy });
-  
   Term t_nn = make_shared<FunctionTerm> (s, "*", vector<Term> {ta, tb});
 
-
-  /* OVO KORISTIMO ZA REWRITE KOJI SALJEMO */
+  /* Termovi koji ucestvuju u rewrite */
   Term s_fn = make_shared<FunctionTerm> (s, "s", vector<Term> {xpy});
   Term s_y = make_shared<FunctionTerm> (s, "s", vector<Term> {ty});
   Term s_xpsy = make_shared<FunctionTerm> (s, "+", vector<Term> {s_y, tx});
-
   Term apzero = make_shared<FunctionTerm> (s, "+", vector<Term> {ta, t0});
 
-/*  //formula koja predstavlja rewriting
-  Formula rewrite1 = make_shared<Atom>(s, "rewrite", vector<Term> {tx, ty});
-  //Formula rewrite2 = make_shared<Atom>(s, "rewrite", vector<Term> {tx, xpy});
-  Formula rewrite3 = make_shared<Atom>(s, "rewrite", vector<Term> {ty, t_nn});*/
+ //formule koja predstavljaju rewriting
   Formula rewrite1 = make_shared<Atom>(s, "rewrite", vector<Term> {s_fn, s_xpsy});
   Formula rewrite2 = make_shared<Atom>(s, "rewrite", vector<Term> {apzero, ta});
 
