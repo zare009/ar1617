@@ -2428,6 +2428,7 @@ Term getSubterm (const Term &t){
 
 }
 
+// Funkcija za odredjivanje kriticnih parova
 void getAllCriticalPairs (CriticalPair &criticals, Formula f1, Formula f2, Signature &s) {
   cout << "Uzimamo kriticne parove za " << f1 << " i " << f2 << endl;
   cout << endl;
@@ -2499,11 +2500,12 @@ void getAllCriticalPairs (CriticalPair &criticals, Formula f1, Formula f2, Signa
   //term l1[l1'->O(l2)] odredjuje kriticni par <O(r1), O(l1)[O(l1')->O(r2)]>
 }
 
+// Funkcija koja primenjuje Knut Bendix proceduru upotpunjavanja
 void knut_bendix (RewriteSystem &system, Signature &s){
   std::cout << "****Knut Bendix procedura upotpunjavanja****" << std::endl;
   cout << endl << endl;
 
-  //algoritam
+  //pseudo kod algoritama
 
 /*  //za setnju kroz pravila
   RewriteSystem s2 = system;
