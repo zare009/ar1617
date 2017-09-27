@@ -168,19 +168,45 @@ public:
   /* Zamena slobodnih pojavljivanja varijable v termom t */
   virtual Formula substitute(const Variable & v, const Term & t) = 0;
 
+  /* Funkcija simplifikuje formulu (uklanja konstante i nepotrebne 
+     kvantifikatore) */
+  virtual Formula simplify() = 0;
+
+  /* Funkcija svodi formulu na NNF */
+  virtual Formula nnf() = 0;
+
+  /* Pomocna funkcija za izdvajanje kvantifikatora */
+  virtual Formula pullquants() = 0;
+
+  /* Funkcija svodi formulu na PRENEX */
+  virtual Formula prenex() = 0;
+
+  /* Funkcija za skolemizaciju */
+  virtual Formula skolem(Signature & s, vector<Variable> && vars = vector<Variable>());
+  
   virtual ~BaseFormula() {}
 };
 
 ostream & operator << (ostream & ostr, const Formula & f);
 
-/* Funkcija vraca novu varijablu koja se ne pojavljuje ni u f ni u t */
-Variable getUniqueVariable(const Formula & f, const Term & t);
+/* Funkcija vraca novu varijablu koja se ne pojavljuje ni u e1 ni u e2 */
+template <typename T1, typename T2>
+Variable getUniqueVariable(const T1 & e1, const T2 & e2);
+
+/* Funkcija vraca novi funkcijski simbol koji se ne pojavljuje u formuli */
+FunctionSymbol getUniqueFunctionSymbol(const Signature & s);
+
 
 /* Klasa predstavlja sve atomicke formule (True, False i Atom) */
 class AtomicFormula : public BaseFormula {
 
 public:
   virtual unsigned complexity() const;
+  virtual Formula simplify();
+  virtual Formula nnf();
+  virtual Formula pullquants();
+  virtual Formula prenex();
+
 };
 
 /* Klasa predstavlja logicke konstante (True i False) */
@@ -264,6 +290,12 @@ public:
   virtual bool eval(const Structure & st, 
 		    const Valuation & val) const;
   virtual Formula substitute(const Variable & v, const Term & t);
+
+  virtual Formula simplify();
+  virtual Formula nnf();
+  virtual Formula pullquants();
+  virtual Formula prenex();
+
 };
 
 /* Klasa predstavlja sve binarne veznike */
@@ -288,7 +320,13 @@ public:
   virtual bool eval(const Structure & st, 
 		    const Valuation & val) const;
   virtual Formula substitute(const Variable & v, const Term & t); 
- };
+
+  virtual Formula simplify();
+  virtual Formula nnf();
+  virtual Formula pullquants();
+  virtual Formula prenex();
+
+};
 
 
 /* Klasa predstavlja disjunkciju */
@@ -300,6 +338,12 @@ public:
   virtual bool eval(const Structure & st, 
 		    const Valuation & val) const;
   virtual Formula substitute(const Variable & v, const Term & t);
+
+  virtual Formula simplify();
+  virtual Formula nnf();
+  virtual Formula pullquants();
+  virtual Formula prenex();
+
 };
 
 /* Klasa predstavlja implikaciju */
@@ -311,6 +355,12 @@ public:
   virtual bool eval(const Structure & st, 
 		    const Valuation & val) const;
   virtual Formula substitute(const Variable & v, const Term & t);
+
+  virtual Formula simplify();
+  virtual Formula nnf();
+  virtual Formula pullquants();
+  virtual Formula prenex();
+
 };
 
 
@@ -324,6 +374,12 @@ public:
   virtual bool eval(const Structure & st, 
 		    const Valuation & val) const;
   virtual Formula substitute(const Variable & v, const Term & t);
+
+  virtual Formula simplify();
+  virtual Formula nnf();
+  virtual Formula pullquants();
+  virtual Formula prenex();
+
 };
 
 /* Klasa predstavlja kvantifikovane formule */
@@ -351,6 +407,13 @@ public:
   virtual bool eval(const Structure & st, 
 		    const Valuation & val) const;
   virtual Formula substitute(const Variable & v, const Term & t);
+
+  virtual Formula simplify();
+  virtual Formula nnf();
+  virtual Formula pullquants();
+  virtual Formula prenex();
+  virtual Formula skolem(Signature & s, vector<Variable> && vars);
+
 };
 
 
@@ -363,6 +426,13 @@ public:
   virtual bool eval(const Structure & st, 
 		    const Valuation & val) const;
   virtual Formula substitute(const Variable & v, const Term & t);
+
+  virtual Formula simplify();
+  virtual Formula nnf();
+  virtual Formula pullquants();
+  virtual Formula prenex();
+  virtual Formula skolem(Signature & s, vector<Variable> && vars);
+
 };
 
 /* Tip podataka kojim se predstavlja domen. U opstem slucaju, domen u logici
@@ -923,6 +993,681 @@ bool Exists::eval(const Structure & st,
 
 // -----------------------------------------------------------------------
 
+// Funkcije za simplifikaciju -------------------------------------------
+
+/* Simplifikacija atomicke formule je trivijalna */
+Formula AtomicFormula::simplify()
+{
+  return shared_from_this();
+}
+
+Formula Not::simplify()
+{
+  Formula simp_op = _op->simplify();
+  
+  if(simp_op->getType() == T_TRUE)
+    return make_shared<False>();
+  else if(simp_op->getType() == T_FALSE)
+    return make_shared<True>();
+  else
+    return make_shared<Not>(simp_op);
+}
+
+Formula And::simplify()
+{
+  /* Simplifikacija konjukcije po pravilima A /\ True === A, 
+     A /\ False === False i sl. */
+  Formula simp_op1 = _op1->simplify();
+  Formula simp_op2 = _op2->simplify();
+  
+  if(simp_op1->getType() == T_TRUE)
+    {
+      return simp_op2;
+    }
+  else if(simp_op2->getType() == T_TRUE)
+    return simp_op1;
+  else if(simp_op1->getType() == T_FALSE ||
+	  simp_op2->getType() == T_FALSE)
+    return make_shared<False>();
+  else
+    return make_shared<And>(simp_op1, simp_op2);
+}
+
+Formula Or::simplify()
+{
+  /* Simplifikacija disjunkcije po pravilima: A \/ True === True,
+     A \/ False === A, i sl. */
+  Formula simp_op1 = _op1->simplify();
+  Formula simp_op2 = _op2->simplify();
+  
+  if(simp_op1->getType() == T_FALSE) 
+    return simp_op2;
+  else if(simp_op2->getType() == T_FALSE)
+    return simp_op1;
+  else if(simp_op1->getType() == T_TRUE ||
+	  simp_op2->getType() == T_TRUE)
+    return make_shared<True>();
+  else
+    return make_shared<Or>(simp_op1, simp_op2);
+}
+
+Formula Imp::simplify()
+{
+  /* Simplifikacija implikacije po pravilima: A ==> True === True,
+     A ==> False === ~A, True ==> A === A, False ==> A === True */
+  Formula simp_op1 = _op1->simplify();
+  Formula simp_op2 = _op2->simplify();
+  
+  if(simp_op1->getType() == T_FALSE) 
+    return make_shared<True>();
+  else if(simp_op2->getType() == T_FALSE)
+    return make_shared<Not>(simp_op1);
+  else if(simp_op1->getType() == T_TRUE)
+    return simp_op2;
+  else if(simp_op2->getType() == T_TRUE)
+    return make_shared<True>();
+  else
+    return make_shared<Imp>(simp_op1, simp_op2);
+}
+
+Formula Iff::simplify()
+{
+  /* Ekvivalencija se simplifikuje pomocu pravila:
+     True <=> A === A, False <=> A === ~A i sl. */
+  
+  Formula simp_op1 = _op1->simplify();
+  Formula simp_op2 = _op2->simplify();
+
+  if(simp_op1->getType() == T_FALSE && simp_op2->getType() == T_FALSE)
+    return make_shared<True>();
+  else if(simp_op1->getType() == T_FALSE) 
+    return make_shared<Not>(simp_op2);
+  else if(simp_op2->getType() == T_FALSE)
+    return make_shared<Not>(simp_op1);
+  else if(simp_op1->getType() == T_TRUE)
+    return simp_op2;
+  else if(simp_op2->getType() == T_TRUE)
+    return simp_op1;
+  else
+    return make_shared<Iff>(simp_op1, simp_op2);
+}
+
+Formula Forall::simplify()
+{
+  Formula simp_op = _op->simplify();
+  
+  /* Ako simplifikovana podformula sadrzi slobodnu varijablu v, tada
+     zadrzavamo kvantifikator, u suprotnom ga brisemo */
+  if(simp_op->containsVariable(_v, true))
+    return  make_shared<Forall>(_v, simp_op);
+  else
+    return simp_op;
+}
+
+Formula Exists::simplify()
+{
+  Formula simp_op = _op->simplify();
+
+  /* Ako simplifikovana podformula sadrzi slobodnu varijablu v, tada
+     zadrzavamo kvantifikator, u suprotnom ga brisemo */
+  if(simp_op->containsVariable(_v, true))
+    return make_shared<Exists>(_v, simp_op);
+  else
+    return simp_op;
+}
+
+
+
+// ---------------------------------------------------------------------
+
+
+// NNF funkcije --------------------------------------------------------
+
+Formula AtomicFormula::nnf()
+{
+  return shared_from_this();
+}
+
+Formula Not::nnf()
+{
+  /* Eliminacija dvojne negacije */
+  if(_op->getType() == T_NOT)
+    {
+      Not * not_op = (Not *) _op.get();
+      return not_op->getOperand()->nnf();
+    }
+  /* De-Morganov zakon ~(A/\B) === ~A \/ ~B, pa zatim rekurzivna 
+     primena nnf-a na ~A i ~B */
+  else if(_op->getType() == T_AND)
+    {
+      And * and_op =  (And *) _op.get();
+	
+      return make_shared<Or>(make_shared<Not>(and_op->getOperand1())->nnf(),
+			     make_shared<Not>(and_op->getOperand2())->nnf());
+      
+    }
+  /* De-Morganov zakon ~(A\/B) === ~A /\ ~B, pa zatim rekurzivna 
+     primena nnf-a na ~A i ~B */
+  else if(_op->getType() == T_OR)
+    {
+      Or * or_op =  (Or *) _op.get();
+      
+      return make_shared<And>(make_shared<Not>(or_op->getOperand1())->nnf(),
+			      make_shared<Not>(or_op->getOperand2())->nnf());
+      
+    }
+  /* De-Morganov zakon ~(A==>B) === A /\ ~B, pa zatim rekurzivna
+     primena nnf-a na A i ~B */
+  else if(_op->getType() == T_IMP)
+    {
+      Imp * imp_op =  (Imp *) _op.get();
+	
+      return make_shared<And>(imp_op->getOperand1()->nnf(),
+			      make_shared<Not>(imp_op->getOperand2())->nnf());
+      
+    }
+  /* Primena pravila ~(A<=>B) === (A /\ ~B) \/ (B /\ ~A) */
+  else if(_op->getType() == T_IFF)
+    {
+      Iff * iff_op =  (Iff *) _op.get();
+      
+      return make_shared<Or>(make_shared<And>(iff_op->getOperand1()->nnf(),
+					      make_shared<Not>(iff_op->getOperand2())->nnf()),
+			     make_shared<And>(iff_op->getOperand2()->nnf(),
+					      make_shared<Not>(iff_op->getOperand1())->nnf()));
+      
+    }
+  /* Primena pravila ~(forall x) A === (exists x) ~A */ 
+  else if(_op->getType() == T_FORALL)
+    {
+      Forall * forall_op = (Forall *) _op.get();      
+
+      return make_shared<Exists>(forall_op->getVariable(), 
+				 make_shared<Not>(forall_op->getOperand())->nnf());
+    }
+  /* Primena pravila ~(exists x) A === (forall x) ~A */
+  else if(_op->getType() == T_EXISTS)
+    {
+      Exists * exists_op = (Exists *) _op.get();      
+      
+      return make_shared<Forall>(exists_op->getVariable(), 
+				 make_shared<Not>(exists_op->getOperand())->nnf());
+    }
+  else
+    {
+      return shared_from_this();
+    } 
+}
+
+Formula And::nnf()
+{
+  return make_shared<And>(_op1->nnf(), _op2->nnf());
+}
+
+Formula Or::nnf()
+{
+  return make_shared<Or>(_op1->nnf(), _op2->nnf());
+}
+
+Formula Imp::nnf()
+{
+  /* Eliminacija implikacije, pa zatim rekurzivna primena nnf()-a */
+  return make_shared<Or>(make_shared<Not>(_op1)->nnf(), _op2->nnf());
+}
+
+Formula Iff::nnf()
+{
+  /* Eliminacija ekvivalencije, pa zatim rekurzivna primena nnf()-a.
+     Primetimo da se ovde velicina formule duplira */
+  return make_shared<And>(make_shared<Or>(make_shared<Not>(_op1)->nnf(), _op2->nnf()),
+			  make_shared<Or>(make_shared<Not>(_op2)->nnf(), _op1->nnf()));
+}
+
+Formula Forall::nnf()
+{
+  return make_shared<Forall>(_v, _op->nnf());
+}
+
+Formula Exists::nnf()
+{
+  return make_shared<Exists>(_v, _op->nnf());
+}
+
+// Funkcije za izvlacenje kvantifikatora  ------------------------------
+
+Formula AtomicFormula::pullquants()
+{
+  /* U slucaju atomicke formule, ne radimo nista */
+  return shared_from_this();
+}
+
+Formula Not::pullquants()
+{
+  /* U slucaju negacije, ne radimo nista, s obzirom da je formula
+     vec u NNF-u, pa su negacije spustene do nivoa atoma. */
+  return shared_from_this();
+}
+
+Formula And::pullquants()
+{
+  /* Ako je formula oblika (forall x) A /\ (forall y) B */
+  if(_op1->getType() == T_FORALL && _op2->getType() == T_FORALL)
+    {
+      Forall * fop1 = (Forall *) _op1.get();
+      Forall * fop2 = (Forall *) _op2.get();
+      
+      /* Specijalno, ako je formula oblika (forall x) A /\ (forall x) B
+	 tada ne moramo da preimenujemo vezanu promenljivu, vec samo
+	 izvlacimo kvantifikator (forall x) (A /\ B), a zatim iz podformule
+	 rekurzivno izvucemo kvantifikatore */
+      if(fop1->getVariable() == fop2->getVariable())
+	{
+	  return make_shared<Forall>(fop1->getVariable(), 
+				     make_shared<And>(fop1->getOperand(),
+						      fop2->getOperand())->pullquants());
+	}
+      /* U suprotnom, uvodimo novu promenljivu koja se ne pojavljuje
+	 ni u jednoj od  formula A i B */
+      else {
+	Variable var = 
+	  getUniqueVariable(fop1->getOperand(), fop2->getOperand());
+	
+	return make_shared<Forall>(var, 
+				   make_shared<And>(fop1->
+						    getOperand()->
+						    substitute(fop1->getVariable(),
+							       make_shared<VariableTerm>(var)),
+						    fop2->
+						    getOperand()->
+						    substitute(fop2->getVariable(),
+							       make_shared<VariableTerm>(var)))->pullquants());
+      } 
+    }
+  /* Slucaj ((exists x) A) /\ B */
+  else if(_op1->getType() == T_EXISTS)
+    {
+      Exists * eop1 = (Exists *) _op1.get();
+      
+      /* Ako x ne postoji kao slobodna varijabla u B, tada je dovoljno
+	 samo izvuci kvantifikator (exists x) (A /\ B) */
+      if(!_op2->containsVariable(eop1->getVariable(), true))
+	{
+	  return make_shared<Exists>(eop1->getVariable(), 
+				     make_shared<And>(eop1->getOperand(), _op2)->pullquants());
+	}
+      /* u suprotnom, moramo da preimenujemo vezanu varijablu */
+      else
+	{
+	  Variable var = getUniqueVariable(eop1->getOperand(), _op2);
+	  return make_shared<Exists>(var, 
+				     make_shared<And>(eop1->getOperand()->
+						      substitute(eop1->getVariable(), 
+								 make_shared<VariableTerm>(var)),
+						      _op2)->pullquants());
+	}
+    }
+  /* Slucaj A /\ (exists x) B */
+  else if(_op2->getType() == T_EXISTS)
+    {
+      Exists * eop2 = (Exists *) _op2.get();
+      
+      /* Ako x ne postoji kao slobodna varijabla u A, tada je dovoljno
+	 samo izvuci kvantifikator (exists x) (A /\ B) */
+      if(!_op1->containsVariable(eop2->getVariable(), true))
+	{
+	  return make_shared<Exists>(eop2->getVariable(), 
+				     make_shared<And>(_op1, eop2->getOperand())->pullquants());
+	}
+      /* u suprotnom, moramo da preimenujemo vezanu varijablu */
+      else
+	{
+	  Variable var = getUniqueVariable(eop2->getOperand(), _op1);
+	  return make_shared<Exists>(var, 
+				     make_shared<And>(_op1, 
+						      eop2->getOperand()->
+						      substitute(eop2->getVariable(), 
+								 make_shared<VariableTerm>(var)))->pullquants());
+	}
+    }
+  /* Slucaj ((forall x) A) /\ B */
+  else if(_op1->getType() == T_FORALL)
+    {
+      Forall * fop1 = (Forall *) _op1.get();
+      
+      /* Ako x ne postoji kao slobodna varijabla u B, tada je dovoljno
+	 samo izvuci kvantifikator (forall x) (A /\ B) */
+      if(!_op2->containsVariable(fop1->getVariable(), true))
+	{
+	  return make_shared<Forall>(fop1->getVariable(), 
+				     make_shared<And>(fop1->getOperand(), _op2)->pullquants());
+	}
+      /* u suprotnom, moramo da preimenujemo vezanu varijablu */
+      else
+	{
+	  Variable var = getUniqueVariable(fop1->getOperand(), _op2);
+	  return make_shared<Forall>(var, make_shared<And>(fop1->getOperand()->
+							   substitute(fop1->getVariable(), 
+								      make_shared<VariableTerm>(var)),
+							   _op2)->pullquants());
+	}
+    }
+  /* Slucaj A /\ (forall x) B */
+  else if(_op2->getType() == T_FORALL)
+    {
+      Forall * fop2 = (Forall *) _op2.get();
+      
+      /* Ako x ne postoji kao slobodna varijabla u A, tada je dovoljno
+	 samo izvuci kvantifikator (forall x) (A /\ B) */
+      if(!_op1->containsVariable(fop2->getVariable(), true))
+	{
+	  return make_shared<Forall>(fop2->getVariable(), 
+				     make_shared<And>(_op1, fop2->getOperand())->pullquants());
+	}
+      /* u suprotnom, moramo da preimenujemo vezanu varijablu */
+      else
+	{
+	  Variable var = getUniqueVariable(fop2->getOperand(), _op1);
+	  return make_shared<Forall>(var, 
+				     make_shared<And>(_op1, 
+						      fop2->getOperand()->
+						      substitute(fop2->getVariable(), 
+								 make_shared<VariableTerm>(var)))->pullquants());
+	}
+    }
+  /* Formula je oblika A /\ B, gde ni A ni B nemaju kvantifikator kao vodeci
+     veznik. U tom slucaju, ne radimo nista, jer su svi kvantifikatori izvuceni. */
+  else
+    {
+      return shared_from_this();
+    }
+}
+
+
+
+Formula Or::pullquants()
+{
+  /* Ako je formula oblika (exists x) A \/ (exists y) B */
+  if(_op1->getType() == T_EXISTS && _op2->getType() == T_EXISTS)
+    {
+      Exists * fop1 = (Exists *) _op1.get();
+      Exists * fop2 = (Exists *) _op2.get();
+      
+      /* Specijalno, ako je formula oblika (exists x) A \/ (exists x) B
+	 tada ne moramo da preimenujemo vezanu promenljivu, vec samo
+	 izvlacimo kvantifikator (exists x) (A \/ B), a zatim iz podformule
+	 rekurzivno izvucemo kvantifikatore */
+      if(fop1->getVariable() == fop2->getVariable())
+	{
+	  return make_shared<Exists>(fop1->getVariable(), 
+				     make_shared<Or>(fop1->getOperand(),
+						      fop2->getOperand())->pullquants());
+	}
+      /* U suprotnom, uvodimo novu promenljivu koja se ne pojavljuje
+	 ni u jednoj od  formula A i B */
+      else {
+	Variable var = 
+	  getUniqueVariable(fop1->getOperand(), fop2->getOperand());
+	
+	return make_shared<Exists>(var, 
+				   make_shared<Or>(fop1->
+						   getOperand()->
+						   substitute(fop1->getVariable(),
+							      make_shared<VariableTerm>(var)),
+						   fop2->
+						   getOperand()->
+						   substitute(fop2->getVariable(),
+							      make_shared<VariableTerm>(var)))->pullquants());
+      } 
+    }
+  /* Slucaj ((exists x) A) \/ B */
+  else if(_op1->getType() == T_EXISTS)
+    {
+      Exists * eop1 = (Exists *) _op1.get();
+      
+      /* Ako x ne postoji kao slobodna varijabla u B, tada je dovoljno
+	 samo izvuci kvantifikator (exists x) (A /\ B) */
+      if(!_op2->containsVariable(eop1->getVariable(), true))
+	{
+	  return make_shared<Exists>(eop1->getVariable(), 
+				     make_shared<Or>(eop1->getOperand(), _op2)->pullquants());
+	}
+      /* u suprotnom, moramo da preimenujemo vezanu varijablu */
+      else
+	{
+	  Variable var = getUniqueVariable(eop1->getOperand(), _op2);
+	  return make_shared<Exists>(var, 
+				     make_shared<Or>(eop1->getOperand()->
+						     substitute(eop1->getVariable(), 
+								make_shared<VariableTerm>(var)),
+						     _op2)->pullquants());
+	}
+    }
+  /* Slucaj A \/ (exists x) B */
+  else if(_op2->getType() == T_EXISTS)
+    {
+      Exists * eop2 = (Exists *) _op2.get();
+      
+      /* Ako x ne postoji kao slobodna varijabla u A, tada je dovoljno
+	 samo izvuci kvantifikator (exists x) (A \/ B) */
+      if(!_op1->containsVariable(eop2->getVariable(), true))
+	{
+	  return make_shared<Exists>(eop2->getVariable(), 
+				     make_shared<Or>(_op1, eop2->getOperand())->pullquants());
+	}
+      /* u suprotnom, moramo da preimenujemo vezanu varijablu */
+      else
+	{
+	  Variable var = getUniqueVariable(eop2->getOperand(), _op1);
+	  return make_shared<Exists>(var, 
+				     make_shared<Or>(_op1, 
+						     eop2->getOperand()->
+						     substitute(eop2->getVariable(), 
+								make_shared<VariableTerm>(var)))->pullquants());
+	}
+    }
+  /* Slucaj ((forall x) A) \/ B */
+  else if(_op1->getType() == T_FORALL)
+    {
+      Forall * fop1 = (Forall *) _op1.get();
+      
+      /* Ako x ne postoji kao slobodna varijabla u B, tada je dovoljno
+	 samo izvuci kvantifikator (forall x) (A \/ B) */
+      if(!_op2->containsVariable(fop1->getVariable(), true))
+	{
+	  return make_shared<Forall>(fop1->getVariable(), 
+				     make_shared<Or>(fop1->getOperand(), _op2)->pullquants());
+	}
+      /* u suprotnom, moramo da preimenujemo vezanu varijablu */
+      else
+	{
+	  Variable var = getUniqueVariable(fop1->getOperand(), _op2);
+	  return make_shared<Forall>(var, make_shared<Or>(fop1->getOperand()->
+							  substitute(fop1->getVariable(), 
+								     make_shared<VariableTerm>(var)),
+							  _op2)->pullquants());
+	}
+    }
+  /* Slucaj A \/ (forall x) B */
+  else if(_op2->getType() == T_FORALL)
+    {
+      Forall * fop2 = (Forall *) _op2.get();
+      
+      /* Ako x ne postoji kao slobodna varijabla u A, tada je dovoljno
+	 samo izvuci kvantifikator (forall x) (A \/ B) */
+      if(!_op1->containsVariable(fop2->getVariable(), true))
+	{
+	  return make_shared<Forall>(fop2->getVariable(), 
+				     make_shared<Or>(_op1, fop2->getOperand())->pullquants());
+	}
+      /* u suprotnom, moramo da preimenujemo vezanu varijablu */
+      else
+	{
+	  Variable var = getUniqueVariable(fop2->getOperand(), _op1);
+	  return make_shared<Forall>(var, 
+				     make_shared<Or>(_op1, 
+						     fop2->getOperand()->
+						     substitute(fop2->getVariable(), 
+								make_shared<VariableTerm>(var)))->pullquants());
+	}
+    }
+  /* Formula je oblika A \/ B, gde ni A ni B nemaju kvantifikator kao vodeci
+     veznik. U tom slucaju, ne radimo nista, jer su svi kvantifikatori izvuceni. */
+  else
+    {
+      return shared_from_this();
+    }
+
+}
+
+Formula Imp::pullquants()
+{
+  /* Implikacija ne bi trebalo da se pojavi, jer je formula vec u NNF-u */
+  throw "pullquants not applicable";
+}
+
+Formula Iff::pullquants()
+{
+  /* Ekvivalencija ne bi trebalo da se pojavi, jer je formula vec u NNF-u */
+  throw "pullquants not applicable";
+}
+
+Formula Forall::pullquants()
+{
+  /* U slucaju Forall formule, ne radimo nista */
+  return shared_from_this();
+}
+
+Formula Exists::pullquants()
+{
+  /* U slucaju Exists formule, ne radimo nista */
+  return shared_from_this();
+}
+
+
+// ---------------------------------------------------------------------
+
+
+// ---------------------------------------------------------------------
+
+// Funkcije za PRENEX normalnu formu 
+
+Formula AtomicFormula::prenex()
+{
+  /* U slucaju atomicke formule ne radimo nista */
+  return shared_from_this(); 
+}
+
+Formula Not::prenex()
+{
+  /* U slucaju negacije ne radimo nista, zato sto podrazumevamo
+     da je formula vec u NNF-u, pa su negacije spustene do atoma */
+  return shared_from_this();
+}
+
+Formula And::prenex()
+{
+  /* U slucaju formule oblika A /\ B, najpre transforimisemo A i B 
+     u PRENEX, a zatim iz dobijene konjukcije izvucemo kvantifikatore */
+  
+  Formula pr_op1 = _op1->prenex();
+  Formula pr_op2 = _op2->prenex();
+  
+  return make_shared<And>(pr_op1, pr_op2)->pullquants();
+}
+
+Formula Or::prenex()
+{
+  /* U slucaju formule oblika A \/ B, najpre transforimisemo A i B 
+     u PRENEX, a zatim iz dobijene disjunkcije izvucemo kvantifikatore */
+
+  Formula pr_op1 = _op1->prenex();
+  Formula pr_op2 = _op2->prenex();
+  
+  return make_shared<Or>(pr_op1, pr_op2)->pullquants();
+}
+
+Formula Imp::prenex()
+{
+  /* Implikacija ne bi trebalo da se pojavi, jer je formula vec u NNF-u */
+  throw "Prenex not applicable";
+}
+
+Formula Iff::prenex()
+{
+  /* Ekvivalencija ne bi trebalo da se pojavi, jer je formula vec u NNF-u */
+  throw "Prenex not applicable";
+}
+
+Formula Forall::prenex()
+{
+  /* U slucaju univerzalnog kvantifikatora, potrebno je samo podformulu
+     svesti na prenex formu */
+  return make_shared<Forall>(_v, _op->prenex());
+}
+
+Formula Exists::prenex()
+{
+  /* U slucaju egzistencijalnog kvantifikatora, potrebno je samo podformulu
+     svesti na prenex formu */
+  return make_shared<Exists>(_v, _op->prenex());
+}
+
+// -----------------------------------------------------------------------
+
+// Funkcije za skolemizaciju ---------------------------------------------
+
+/* Kod funkcija za skolemizaciju, podrazumeva se da je formula u PRENEX
+   normalnoj formi, tj. oblika (Q1 x1) (Q2 x2) ... (Qn xn) A, gde su 
+   Qi \in {forall, exists}, dok je A formula bez kvantifikatora koja ne
+   sadrzi druge varijable osim x1,...,xn */
+
+Formula BaseFormula::skolem(Signature & s, vector<Variable> && vars)
+{
+  /* Podrazumevano, za formulu bez kvantifikatora, ne radimo nista */
+  return shared_from_this();
+}
+
+Formula Forall::skolem(Signature & s, vector<Variable> && vars)
+{
+  /* Ako je formula oblika (forall x) A, tada samo dodajemo varijablu
+     x u sekvencu univerzalno kvantifikovanih varijabli, i zatim pozivamo
+     rekurzivni poziv za podformulu */
+  vars.push_back(_v);
+  return make_shared<Forall>(_v, _op->skolem(s, std::move(vars)));
+}
+
+Formula Exists::skolem(Signature & s, vector<Variable> && vars)
+{
+  /* Kada naidjemo na egzistencijalni kvantifikator (exists y), 
+     tada je potrebno eliminisati ga, uvodjenjem novog funkcijskog simbola 
+     u signaturu, pa zato najpre uvodimo novi simbol koji nije prisutan u 
+     signaturu s */
+  FunctionSymbol f = getUniqueFunctionSymbol(s);
+  
+  /* Dodajemo f u signaturu sa arnoscu k = vars.size(), tj. arnost je jednaka
+     broju univerzalno kvantifikovanih varijabli koje prethode egzistencijalnom
+     kvantifikatoru. Primetimo da ako je k = 0, tj. ako nije bilo univerzalnih
+     kvantifikatora pre datog egzistencijalnog, tada ce se uvesti u signaturu
+     novi funkcijski simbol arnosti 0, tj. simbol konstante 
+     (Skolemova konstanta). */
+  s.addFunctionSymbol(f, vars.size());
+
+  /* Kreiramo vektor termova x1,x2,...,xk */
+  vector<Term> varTerms;
+
+  for(unsigned i = 0; i < vars.size(); i++)
+    varTerms.push_back(make_shared<VariableTerm>(vars[i]));
+
+  /* Kreiramo term f(x1,...,xk) */
+  Term t = make_shared<FunctionTerm>(s, f, varTerms);
+
+  /* Zamenjujemo u podformuli y -> f(x1,...,xk), a zatim nastavljamo
+     rekurzivno skolemizaciju u podformuli. */
+  return _op->substitute(_v, t)->skolem(s, std::move(vars));
+}
+
+// -----------------------------------------------------------------------
+
 // Ostale funkcije clanice -----------------------------------------------
 
 // Klasa Signature -------------------------------------------------------
@@ -1182,7 +1927,8 @@ bool BaseFormula::containsVariable(const Variable & v, bool free) const
 
 // ----------------------------------------------------------------------
 
-Variable getUniqueVariable(const Formula & f, const Term & t)
+template <typename T1, typename T2>
+Variable getUniqueVariable(const T1 & e1, const T2 & e2)
 {
   static unsigned i = 0;
   
@@ -1190,9 +1936,23 @@ Variable getUniqueVariable(const Formula & f, const Term & t)
   
   do {    
     v = string("uv") + to_string(++i);
-  } while(t->containsVariable(v) || f->containsVariable(v));
+  } while(e1->containsVariable(v) || e2->containsVariable(v));
   
   return v;
+}
+
+FunctionSymbol getUniqueFunctionSymbol(const Signature & s)
+{
+  static unsigned i = 0;
+  unsigned arity;
+
+  FunctionSymbol f;
+  
+  do {
+    f = string("uf") + to_string(++i);
+  } while(s.checkFunctionSymbol(f, arity));
+  
+  return f;
 }
 
 // ----------------------------------------------------------------------
@@ -1739,11 +2499,9 @@ void getAllCriticalPairs (CriticalPair &criticals, Formula f1, Formula f2, Signa
   //term l1[l1'->O(l2)] odredjuje kriticni par <O(r1), O(l1)[O(l1')->O(r2)]>
 }
 
-void knut_bendix (RewriteSystem &system, RewriteSystem &returnSystem, Signature &s){
+void knut_bendix (RewriteSystem &system, Signature &s){
   std::cout << "****Knut Bendix procedura upotpunjavanja****" << std::endl;
   cout << endl << endl;
-
-  RewriteSystem s2 = system;
 
   //algoritam
 
@@ -1783,8 +2541,21 @@ void knut_bendix (RewriteSystem &system, RewriteSystem &returnSystem, Signature 
 
   getAllCriticalPairs(criticals, *it, *it2, s);
 
+  Formula u1 = make_shared<Atom> (s, "u1", vector<Term>{criticals.t1});
+  Formula u2 = make_shared<Atom> (s, "u2", vector<Term>{criticals.t2});
 
+  //nema smisla bas ali ajde
+  Formula u1_normal = u1->simplify()->nnf()->prenex()->skolem(s);
+  Formula u2_normal = u2->simplify()->nnf()->prenex()->skolem(s);
 
+  if (u1_normal->equalTo(u2_normal)){
+    cout << "Sistem ne moze biti dopunjen" << endl;
+    return;
+  }
+
+  /*TODO  odraditi funkciju za dobro uredjenje termova */
+  Formula rewrite = make_shared<Atom>(s, "rewrite", vector<Term> {criticals.t1, criticals.t2});
+  system.insert(rewrite);
 }
 
 
@@ -1804,6 +2575,8 @@ int main()
   s.addPredicateSymbol("odd", 1);
   s.addPredicateSymbol("=", 2);
   s.addPredicateSymbol("<=", 2);
+  s.addPredicateSymbol("u1", 1);
+  s.addPredicateSymbol("u2", 1);
 
   //rewrite predicate symbol
   s.addPredicateSymbol("rewrite", 2);
@@ -1830,7 +2603,6 @@ int main()
   Formula rewrite2 = make_shared<Atom>(s, "rewrite", vector<Term> {apzero, ta});
 
   RewriteSystem system;
-  RewriteSystem returnSystem;
 
   system.insert(rewrite1);
   system.insert(rewrite2);
@@ -1846,13 +2618,13 @@ int main()
 
   cout << endl << endl << endl;
 
-  knut_bendix (system, returnSystem, s);
+  knut_bendix (system, s);
 
   cout << endl << endl << endl;
-  cout << "Ispisujemo dopunjen sistem" << endl;
+  cout << "**********Ispisujemo dopunjen sistem************" << endl;
   //printing completation set of rewrites
   cout << "{ ";
-  for (RewriteSystem::iterator it = returnSystem.begin(); it != returnSystem.end(); it++) {
+  for (RewriteSystem::iterator it = system.begin(); it != system.end(); it++) {
 
       cout << *it << " ";
   }
