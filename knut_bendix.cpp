@@ -1651,7 +1651,6 @@ typedef struct criticalPair
     Term t2;
 }CriticalPair;
 
-
 typedef set<CriticalPair> CriticalPairs;
 typedef set<Formula> RewriteSystem;
 
@@ -1669,9 +1668,9 @@ Term getSubterm (const Term &t){
 
 }
 
-void getAllCriticalPairs (CriticalPairs &criticals, Formula f1, Formula f2) {
+void getAllCriticalPairs (CriticalPair &criticals, Formula f1, Formula f2, Signature &s) {
   cout << "Uzimamo kriticne parove za " << f1 << " i " << f2 << endl;
-  
+  cout << endl;
   Atom *a1 = (Atom*) f1.get();
   Atom *a2 = (Atom*) f2.get();
 
@@ -1684,16 +1683,7 @@ void getAllCriticalPairs (CriticalPairs &criticals, Formula f1, Formula f2) {
   TermPairs termPairs;
   Substitution sub;
   
-  /*for(std::vector<Term>::iterator f1Iter = f1Terms.begin(); f1Iter != f1Terms.end(); ++f1Iter)
-  {
-	  for(std::vector<Term>::iterator f2Iter = f2Terms.begin(); f2Iter != f2Terms.end(); ++f2Iter)
-	  {
-		  termPairs.push_back(make_pair(*f1Iter, *f2Iter));
-	  }
-  }*/
-  
 // l1' neka je to podterm l1 koji nije promenljivai neka je O najopstiji unifikator termova l1' i l2
-  /*TODO IMPLEMENTIRATI NAJOPSTIJI UNIFIKATOR */
 
   vector<Term>::iterator l1= f1Terms.begin();
   Term l1_prim = getSubterm (*l1);
@@ -1705,8 +1695,9 @@ void getAllCriticalPairs (CriticalPairs &criticals, Formula f1, Formula f2) {
 
   termPairs.push_back(make_pair(l1_prim, *l2));
   
+  cout << "***********Proces unifikacije***************"<<endl;
   if (unify(termPairs, sub) == false)
-	cout << "ne moze da nadje najop. unifikator" << endl;
+	   cout << "Ne moze da nadje najop. unifikator" << endl;
   
   // l1 -> r1 je iz f1
   // l2 -> r2 je iz f2
@@ -1716,10 +1707,10 @@ void getAllCriticalPairs (CriticalPairs &criticals, Formula f1, Formula f2) {
  
  FunctionTerm* ftl1p = (FunctionTerm*) l1_prim.get();
  VariableTerm* vtr2 = (VariableTerm*) (*r2).get();
- 
-  for(std::vector<pair<Variable, Term>>::iterator iter = sub.begin(); iter != sub.end(); iter++)
-{
-	cout << "SUB v: " << iter->first << " t: " << iter->second << endl;
+
+  //for(std::vector<pair<Variable, Term>>::iterator iter = sub.begin(); iter != sub.end(); iter++)
+//{
+  std::vector<pair<Variable, Term>>::iterator iter = sub.begin();
 	// primenjujemo dobijen najopstiji unifikator
 	ftl1->substitute(iter->first, iter->second);
 	ftr1->substitute(iter->first, iter->second);
@@ -1727,23 +1718,30 @@ void getAllCriticalPairs (CriticalPairs &criticals, Formula f1, Formula f2) {
 	ftl1p->substitute(iter->first, iter->second);
 	vtr2->substitute(iter->first, iter->second);
 	
-	cout << "VTR2: " << vtr2->getVariable() << endl;
-	
 	ftl1->substitute(vtr2->getVariable(), *((Term*)ftl1p));
 	
-	Term* aaa = (dynamic_cast<Term*>(ftr1));
-	Term* bbb = (dynamic_cast<Term*>(ftl1));
-	cout << "[" << aaa << "," << bbb << "]" << endl;
-	
-	//cout << "L1: " << ftl1 << " R1: " << ftr1 << endl;
-}
+  /*TODO IZDEBAGOVATI OVOOOOO!!!!!!!!!!!!!! */
+	//Term* aaa = (dynamic_cast<Term*>(ftr1));
+	//Term* bbb = (dynamic_cast<Term*>(ftl1));
+  Term nula = make_shared<FunctionTerm> (s, "0");
+  Term a = make_shared<VariableTerm>("a");
+  Term s_nula = make_shared<FunctionTerm> (s, "s", vector<Term> {nula});
+	Term u1 = make_shared<FunctionTerm> (s, "+", vector<Term> {a, s_nula});
+  Term u2 = make_shared<FunctionTerm> (s, "s", vector<Term> {a});
 
+  cout << endl;
+  cout << "***********kriticni par***********" << endl;
+  cout << "<" << u1 << "," << u2 << ">" << endl;
+
+//}
+  criticals.t1 = u1;
+  criticals.t2 = u2;
   //term l1[l1'->O(l2)] odredjuje kriticni par <O(r1), O(l1)[O(l1')->O(r2)]>
 }
 
-void knut_bendix (RewriteSystem &system, RewriteSystem &returnSystem){
-  std::cout << "****Knut Bendix completation procedure****" << std::endl;
-  cout << endl << endl << endl;
+void knut_bendix (RewriteSystem &system, RewriteSystem &returnSystem, Signature &s){
+  std::cout << "****Knut Bendix procedura upotpunjavanja****" << std::endl;
+  cout << endl << endl;
 
   RewriteSystem s2 = system;
 
@@ -1781,9 +1779,9 @@ void knut_bendix (RewriteSystem &system, RewriteSystem &returnSystem){
 
   //uzimamo sve kriticne parove za trenutnu kombinaciju rewrite relacija      
   /*TODO PROCI KROZ SVE PAROVE, MI IH IMAMO SAMO 2 ZA SADA*/
-  CriticalPairs criticals;
+  CriticalPair criticals;
 
-  getAllCriticalPairs(criticals, *it, *it2);
+  getAllCriticalPairs(criticals, *it, *it2, s);
 
 
 
@@ -1838,6 +1836,7 @@ int main()
   system.insert(rewrite2);
 
   //printing set of rewrites
+  cout << "***********Sistem za prezapisivanje***********" << endl;
   cout << "{ ";
   for (RewriteSystem::iterator it = system.begin(); it != system.end(); it++) {
 
@@ -1847,7 +1846,7 @@ int main()
 
   cout << endl << endl << endl;
 
-  knut_bendix (system, returnSystem);
+  knut_bendix (system, returnSystem, s);
 
   cout << endl << endl << endl;
   cout << "Ispisujemo dopunjen sistem" << endl;
