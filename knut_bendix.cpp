@@ -2546,7 +2546,9 @@ void knut_bendix (RewriteSystem &system, Signature &s){
   Formula u1 = make_shared<Atom> (s, "u1", vector<Term>{criticals.t1});
   Formula u2 = make_shared<Atom> (s, "u2", vector<Term>{criticals.t2});
 
-  //nema smisla bas ali ajde
+  //TODO OVDE TREBA ODRADITI NORMALNU FORMU TERMOVA
+  //to znaci term na koji nije moguce primeniti vise nijedno pravilo prezapisivanja
+  //ali cisto da ima nesto ovde
   Formula u1_normal = u1->simplify()->nnf()->prenex()->skolem(s);
   Formula u2_normal = u2->simplify()->nnf()->prenex()->skolem(s);
 
